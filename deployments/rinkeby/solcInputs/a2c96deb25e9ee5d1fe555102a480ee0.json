@@ -1,0 +1,41 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/CrowdFund.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\nimport \"./PriceConverter.sol\";\n\n// Error\n\nerror CrowdFund__NotOwner();\n\n// Contract\n\ncontract CrowdFund {\n    // type initializer\n    using PriceConverter for uint256;\n\n    // data types\n    uint256 private constant MIN_AMOUNT = 50;\n    address private immutable owner;\n\n    // storage data types (computationaly expensive)\n\n    address[] private funders;\n    mapping(address => uint256) private balances;\n\n    AggregatorV3Interface private priceFeed;\n\n    // Modifiers\n\n    modifier OnlyOwner() {\n        if (owner != msg.sender) {\n            revert CrowdFund__NotOwner();\n        }\n        _;\n    }\n\n    // Constructor\n\n    constructor(address addressArgument) {\n        owner = msg.sender;\n        priceFeed = AggregatorV3Interface(addressArgument);\n    }\n\n    // getter functions\n\n    function getOwner() public view returns (address) {\n        return owner;\n    }\n\n    function getFunder(uint256 index) public view returns (address) {\n        return funders[index];\n    }\n\n    function getAmountFundedByTheAddress(address funder)\n        public\n        view\n        returns (uint256)\n    {\n        return balances[funder];\n    }\n\n    function getPriceFeed() public view returns (AggregatorV3Interface) {\n        return priceFeed;\n    }\n\n    // functions\n\n    function fund() public payable {\n        require(\n            msg.value.getConversionRate(priceFeed) >= MIN_AMOUNT,\n            \"You need to spend more funds.\"\n        );\n        funders.push(msg.sender);\n        balances[msg.sender] += msg.value;\n    }\n\n    function withDraw() public payable OnlyOwner {\n        address[] memory fundersCopy = funders;\n\n        for (uint256 index = 0; index < fundersCopy.length; index++) {\n            address funder = fundersCopy[index];\n            balances[funder] = 0;\n        }\n\n        funders = new address[](0);\n\n        // verification\n\n        (bool callSuccess, ) = owner.call{value: address(this).balance}(\"\");\n        require(callSuccess, \"call failed\");\n    }\n}\n"
+    },
+    "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface AggregatorV3Interface {\n  function decimals() external view returns (uint8);\n\n  function description() external view returns (string memory);\n\n  function version() external view returns (uint256);\n\n  // getRoundData and latestRoundData should both raise \"No data present\"\n  // if they do not have data to report, instead of returning unset values\n  // which could be misinterpreted as actual reported values.\n  function getRoundData(uint80 _roundId)\n    external\n    view\n    returns (\n      uint80 roundId,\n      int256 answer,\n      uint256 startedAt,\n      uint256 updatedAt,\n      uint80 answeredInRound\n    );\n\n  function latestRoundData()\n    external\n    view\n    returns (\n      uint80 roundId,\n      int256 answer,\n      uint256 startedAt,\n      uint256 updatedAt,\n      uint80 answeredInRound\n    );\n}\n"
+    },
+    "contracts/PriceConverter.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// importing libraries\nimport \"@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol\";\n\n// Library\n\nlibrary PriceConverter {\n    //functions\n\n    function getPrice(AggregatorV3Interface priceFeed)\n        internal\n        view\n        returns (uint256)\n    {\n        (, int256 answer, , , ) = priceFeed.latestRoundData();\n\n        return uint256(answer * 10000000000);\n    }\n\n    function getConversionRate(uint256 amount, AggregatorV3Interface priceFeed)\n        internal\n        view\n        returns (uint256)\n    {\n        uint256 price = getPrice(priceFeed);\n        uint256 ethAmoutInUSD = (price * amount) / 1000000000000000000;\n        return ethAmoutInUSD;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
